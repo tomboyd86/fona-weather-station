@@ -93,7 +93,7 @@ void loop() {
   sleepFONAModule();
   waitFiveSeconds();
   
-  int number_of_sleeper_loops = 10;
+  int number_of_sleeper_loops = 300; // 30 1min, 300 10mins
   for (int i = 0; i < number_of_sleeper_loops; i++) {
       Watchdog.sleep(2000);
   }

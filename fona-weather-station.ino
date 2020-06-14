@@ -5,13 +5,14 @@
 #include "Adafruit_MQTT_FONA.h"
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <Adafruit_BMP280.h>
 
 /* Pins */
 // Default pins for Feather 32u4 FONA
 #define FONA_RX  9
 #define FONA_TX  8
 #define FONA_RST 4
-#define ONE_WIRE_BUS 2
+#define ONE_WIRE_BUS 5
 
 /* APN details */
 #define FONA_APN       "everywhere"
@@ -37,10 +38,15 @@ uint8_t tx_failures = 0;
 
 /* Feeds */
 Adafruit_MQTT_Publish DS18B20_sensor_feed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/DS18B20_sensor");
+Adafruit_MQTT_Publish BMP280_sensor_feed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/BMP280_sensor");
 
 /* DS18B20 */
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature DS18B20_sensor(&oneWire);
+
+/* BMP280 */
+Adafruit_BMP280 bmp;
+Adafruit_Sensor *bmpPressure = bmp.getPressureSensor();
 
 
 void setup() {
@@ -58,6 +64,18 @@ void setup() {
     Serial.println("Retrying FONA");
   }
   Serial.println(F("Connected to Cellular!"));
+
+  if (!bmp.begin()) {
+    Serial.println(F("Could not find a valid BMP280 sensor, check wiring!"));
+    while (1);
+  }
+
+   /* Default settings from datasheet. */
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,
+                  Adafruit_BMP280::SAMPLING_X2,
+                  Adafruit_BMP280::SAMPLING_X16,
+                  Adafruit_BMP280::FILTER_X16,
+                  Adafruit_BMP280::STANDBY_MS_500); 
 
   waitFiveSeconds();
 }
@@ -86,6 +104,17 @@ void loop() {
     tx_failures = 0;
   }
 
+  sensors_event_t pressureEvent;
+  bmpPressure->getEvent(&pressureEvent);
+  
+  if (!BMP280_sensor_feed.publish(pressureEvent.pressure)) {
+    Serial.println(F("Failed"));
+    tx_failures++;
+  } else {
+    Serial.println(F("OK!"));
+    tx_failures = 0;
+  }
+
   if (tx_failures >= MAX_TX_FAILURES){
     // put code here to handle tx failures
   }
@@ -93,7 +122,7 @@ void loop() {
   sleepFONAModule();
   waitFiveSeconds();
   
-  int number_of_sleeper_loops = 300; // 30 1min, 300 10mins
+  int number_of_sleeper_loops = 10; // 30 1min, 300 10mins
   for (int i = 0; i < number_of_sleeper_loops; i++) {
       Watchdog.sleep(2000);
   }
@@ -143,7 +172,6 @@ float getTempReading() {
   }
 
   float avg_t = sum_t / number_of_readings;
-
   return avg_t;
 }
 

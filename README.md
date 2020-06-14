@@ -8,3 +8,4 @@ Arduino powered weather station based on the following equipment
 ## Sensors
 
 [DS18B20](https://www.adafruit.com/product/381)
+[BMP280](https://www.adafruit.com/product/2651)

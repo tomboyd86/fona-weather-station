@@ -6,6 +6,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <Adafruit_BMP280.h>
+#include "DHT.h"
 
 /* Pins */
 // Default pins for Feather 32u4 FONA
@@ -13,6 +14,7 @@
 #define FONA_TX  8
 #define FONA_RST 4
 #define ONE_WIRE_BUS 5
+#define DHTPIN 23
 
 /* APN details */
 #define FONA_APN       "everywhere"
@@ -39,6 +41,7 @@ uint8_t tx_failures = 0;
 /* Feeds */
 Adafruit_MQTT_Publish DS18B20_sensor_feed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/DS18B20_sensor");
 Adafruit_MQTT_Publish BMP280_sensor_feed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/BMP280_sensor");
+Adafruit_MQTT_Publish DHTHumidity_sensor_feed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/DHTHumidity_sensor");
 
 /* DS18B20 */
 OneWire oneWire(ONE_WIRE_BUS);
@@ -48,6 +51,9 @@ DallasTemperature DS18B20_sensor(&oneWire);
 Adafruit_BMP280 bmp;
 Adafruit_Sensor *bmpPressure = bmp.getPressureSensor();
 
+/* DHT22 */
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
 
 void setup() {
   //while (!Serial); // removed for standalone state
@@ -69,6 +75,8 @@ void setup() {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring!"));
     while (1);
   }
+
+  dht.begin();
 
    /* Default settings from datasheet. */
   bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,
@@ -117,6 +125,17 @@ void loop() {
 
   if (tx_failures >= MAX_TX_FAILURES){
     // put code here to handle tx failures
+  }
+
+  float h = dht.readHumidity();
+  Serial.print(F("\nSending hum val"));
+  Serial.print(h);
+  if (!DHTHumidity_sensor_feed.publish(h)) {
+    Serial.println(F("Failed"));
+    tx_failures++;
+  } else {
+    Serial.println(F("OK!"));
+    tx_failures = 0;
   }
 
   sleepFONAModule();
